@@ -1,0 +1,11 @@
+## Append samples of your project ##
+resources:
+- otc_v1alpha1_natgateway.yaml
+- otc_v1alpha1_network.yaml
+- otc_v1alpha1_providerconfig.yaml
+- otc_v1alpha1_publicip.yaml
+- otc_v1alpha1_securitygroup.yaml
+- otc_v1alpha1_securitygrouprule.yaml
+- otc_v1alpha1_snatrule.yaml
+- otc_v1alpha1_subnet.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

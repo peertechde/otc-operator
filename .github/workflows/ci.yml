@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-and-validate:
+    name: Lint and Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Check Go code formatting
+        run: |
+          echo "--- Checking Go code formatting ---"
+          FMT_FILES=$(go fmt ./...)
+          if [ -n "${FMT_FILES}" ]; then
+              echo "The following files are not correctly formatted:"
+              echo "${FMT_FILES}"
+              echo "Please run 'go fmt ./...' and commit the changes."
+              exit 1
+          fi
+
+      - name: Run go vet
+        run: |
+          echo "--- Running go vet ---"
+          make vet
+
+      - name: Check for up-to-date generated code
+        run: |
+          echo "--- Checking if generated manifests and code are up-to-date ---"
+          make generate manifests
+          git diff --exit-code --quiet || (echo "ERROR: Generated code or manifests are out of date. Please run 'make generate manifests' and commit the changes." && exit 1)
+
+  build-and-push-image:
+    name: Build and push image
+    
+    # Only run when a tag is pushed.
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    runs-on: ubuntu-latest
+    needs: lint-and-validate
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            TARGETOS=linux
+            TARGETARCH=amd64
+            GO_LDFLAGS=$(make print-ldflags)

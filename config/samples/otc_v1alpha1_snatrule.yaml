@@ -1,0 +1,9 @@
+apiVersion: otc.peertech.de/v1alpha1
+kind: SNATRule
+metadata:
+  labels:
+    app.kubernetes.io/name: otc-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: snatrule-sample
+spec:
+  # TODO(user): Add fields here

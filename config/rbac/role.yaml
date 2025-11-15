@@ -1,0 +1,61 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - otc.peertech.de
+  resources:
+  - natgateways
+  - networks
+  - providerconfigs
+  - publicips
+  - securitygrouprules
+  - securitygroups
+  - snatrules
+  - subnets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - otc.peertech.de
+  resources:
+  - natgateways/finalizers
+  - networks/finalizers
+  - providerconfigs/finalizers
+  - publicips/finalizers
+  - securitygrouprules/finalizers
+  - securitygroups/finalizers
+  - snatrules/finalizers
+  - subnets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - otc.peertech.de
+  resources:
+  - natgateways/status
+  - networks/status
+  - providerconfigs/status
+  - publicips/status
+  - securitygrouprules/status
+  - securitygroups/status
+  - snatrules/status
+  - subnets/status
+  verbs:
+  - get
+  - patch
+  - update
