@@ -155,6 +155,10 @@ func (v *SecurityGroupRuleCustomValidator) ValidateUpdate(
 		)
 	}
 
+	if len(errors) == 0 {
+		return warnings, nil
+	}
+
 	return warnings, apierrors.NewInvalid(
 		oldSecurityGroupRule.GroupVersionKind().GroupKind(),
 		oldSecurityGroupRule.Name,

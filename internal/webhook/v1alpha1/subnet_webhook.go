@@ -199,6 +199,10 @@ func (v *SubnetCustomValidator) ValidateUpdate(
 		)
 	}
 
+	if len(errors) == 0 {
+		return warnings, nil
+	}
+
 	return warnings, apierrors.NewInvalid(
 		oldSubnet.GroupVersionKind().GroupKind(),
 		oldSubnet.Name,
