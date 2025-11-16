@@ -9,6 +9,8 @@ on:
   pull_request:
     branches:
       - main
+  issue_comment:
+    types: [created]
 
 jobs:
   lint-and-validate:
@@ -48,8 +50,10 @@ jobs:
   build-and-push-image:
     name: Build and push image
     
-    # Only run when a tag is pushed.
-    if: startsWith(github.ref, 'refs/tags/')
+    # Run on a tag push OR on a PR comment that says '/build-image'
+    if: |
+      startsWith(github.ref, 'refs/tags/') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/build-image'))
     
     runs-on: ubuntu-latest
     needs: lint-and-validate
@@ -58,7 +62,14 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout PR Code
+        if: github.event_name == 'issue_comment'
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+
+      - name: Checkout Tag Code
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -83,6 +94,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          tags: |
+            # Generate a tag for the PR number on comment events
+            type=raw,value=pr-${{ github.event.issue.number }},enable=${{ github.event_name == 'issue_comment' }}
+            # Tagging for real releases
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
