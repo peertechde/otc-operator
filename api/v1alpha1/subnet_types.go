@@ -35,7 +35,7 @@ type SubnetSpec struct {
 }
 
 // SubnetNetworkResolved contains the resolved ID for network dependency
-type SubnetDependencieskResolved struct {
+type SubnetDependenciesResolved struct {
 	// NetworkID is the resolved Network ID
 	NetworkID string `json:"networkID,omitempty"`
 }
@@ -52,7 +52,7 @@ type SubnetStatus struct {
 
 	// ResolvedDependencies contains the resolved ID for network dependency
 	// +optional
-	ResolvedDependencies SubnetDependencieskResolved `json:"resolvedDependencies"`
+	ResolvedDependencies SubnetDependenciesResolved `json:"resolvedDependencies"`
 
 	// ObservedGeneration reflects the generation of the most recently observed Subnet spec
 	// +optional
