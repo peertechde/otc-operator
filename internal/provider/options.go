@@ -3,13 +3,15 @@ package provider
 type Option func(o *Options)
 
 type Options struct {
-	Endpoint string
-	User     string
-	Password string
-	Token    string
-	Domain   string
-	Project  string
-	Region   string
+	Endpoint  string
+	User      string
+	Password  string
+	Token     string
+	AccessKey string
+	SecretKey string
+	Domain    string
+	Project   string
+	Region    string
 }
 
 func WithEndpoint(endpoint string) Option {
@@ -33,6 +35,18 @@ func WithPassword(password string) Option {
 func WithToken(token string) Option {
 	return func(o *Options) {
 		o.Token = token
+	}
+}
+
+func WithAccessKey(accessKey string) Option {
+	return func(o *Options) {
+		o.AccessKey = accessKey
+	}
+}
+
+func WithSecretKey(secretKey string) Option {
+	return func(o *Options) {
+		o.SecretKey = secretKey
 	}
 }
 

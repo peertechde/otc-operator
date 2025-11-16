@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	gophercloud "github.com/opentelekomcloud/gophertelekomcloud"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack"
@@ -77,21 +78,50 @@ func New(opts ...Option) (Provider, error) {
 		opt(&options)
 	}
 
-	ao := gophercloud.AuthOptions{
-		IdentityEndpoint: options.Endpoint,
-		Username:         options.User,
-		Password:         options.Password,
-		DomainName:       options.Domain,
-		TenantID:         options.Project,
-	}
-	ao.AllowReauth = true
-
-	client, err := openstack.NewClient(ao.GetIdentityEndpoint())
+	client, err := openstack.NewClient(options.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new client: %w", err)
 	}
 
-	if err := openstack.Authenticate(client, ao); err != nil {
+	// Configure the HTTP client to handle redirects with AK/SK resigning.
+	client.HTTPClient = http.Client{
+		Transport: client.HTTPClient.Transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Only re-sign the request if we are using AK/SK authentication.
+			if options.AccessKey != "" && options.SecretKey != "" {
+				gophercloud.ReSign(req, gophercloud.SignOptions{
+					AccessKey: options.AccessKey,
+					SecretKey: options.SecretKey,
+				})
+			}
+			return nil
+		},
+	}
+
+	var authProvider gophercloud.AuthOptionsProvider
+	if options.AccessKey != "" && options.SecretKey != "" {
+		// Use Access Key / Secret Key authentication
+		authProvider = gophercloud.AKSKAuthOptions{
+			IdentityEndpoint: options.Endpoint,
+			AccessKey:        options.AccessKey,
+			SecretKey:        options.SecretKey,
+			ProjectId:        options.Project,
+		}
+	} else {
+		// Fall back to Username/Password or Token authentication
+		ao := gophercloud.AuthOptions{
+			IdentityEndpoint: options.Endpoint,
+			Username:         options.User,
+			Password:         options.Password,
+			DomainName:       options.Domain,
+			TokenID:          options.Token,
+			TenantID:         options.Project,
+		}
+		ao.AllowReauth = true
+		authProvider = ao
+	}
+
+	if err := openstack.Authenticate(client, authProvider); err != nil {
 		return nil, fmt.Errorf("failed to authenticate: %w", err)
 	}
 

@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	secretKeyUsername = "username"
-	secretKeyPassword = "password"
-	secretKeyToken    = "token"
+	secretKeyUsername  = "username"
+	secretKeyPassword  = "password"
+	secretKeyToken     = "token"
+	secretKeyAccessKey = "accessKey"
+	secretKeySecretKey = "secretKey"
 )
 
 // NewFromProviderConfig is a helper function that constructs a new Provider
@@ -106,6 +108,20 @@ func resolveSecretCredentials(
 		}
 	}
 
+	// Check for AK/SK auth
+	if !foundAuth {
+		if accessKey, ok := secret.Data[secretKeyAccessKey]; ok {
+			if secretKey, ok := secret.Data[secretKeySecretKey]; ok {
+				opts = append(
+					opts,
+					WithAccessKey(string(accessKey)),
+					WithSecretKey(string(secretKey)),
+				)
+				foundAuth = true
+			}
+		}
+	}
+
 	// Check for token auth
 	if !foundAuth {
 		if token, ok := secret.Data[secretKeyToken]; ok {
@@ -115,8 +131,15 @@ func resolveSecretCredentials(
 	}
 
 	if !foundAuth {
-		return nil, fmt.Errorf("secret %s must contain either ('%s' and '%s') or '%s'",
-			ref.Name, secretKeyUsername, secretKeyPassword, secretKeyToken)
+		return nil, fmt.Errorf(
+			"secret %s must contain one of the following combinations: ('%s' and '%s'), ('%s' and '%s') or '%s'",
+			ref.Name,
+			secretKeyUsername,
+			secretKeyPassword,
+			secretKeyAccessKey,
+			secretKeySecretKey,
+			secretKeyToken,
+		)
 	}
 
 	return opts, nil
