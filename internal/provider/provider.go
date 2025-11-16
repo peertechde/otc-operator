@@ -105,7 +105,6 @@ func New(opts ...Option) (Provider, error) {
 			IdentityEndpoint: options.Endpoint,
 			AccessKey:        options.AccessKey,
 			SecretKey:        options.SecretKey,
-			Domain:           options.Domain,
 			ProjectId:        options.Project,
 		}
 	} else {
