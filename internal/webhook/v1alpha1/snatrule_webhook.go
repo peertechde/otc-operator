@@ -62,7 +62,7 @@ func (v *SNATRuleCustomValidator) ValidateCreate(
 		errors = append(
 			errors,
 			field.Invalid(
-				field.NewPath("spec", "natGatetway"),
+				field.NewPath("spec", "natGateway"),
 				snatRule.Spec.NATGateway,
 				err.Error(),
 			),
@@ -148,7 +148,7 @@ func (v *SNATRuleCustomValidator) ValidateUpdate(
 		errors = append(
 			errors,
 			field.Forbidden(
-				field.NewPath("spec", "natGatetway"),
+				field.NewPath("spec", "natGateway"),
 				"is immutable and cannot be changed after creation",
 			),
 		)

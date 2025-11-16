@@ -106,7 +106,15 @@ func (v *NATGatewayCustomValidator) ValidateCreate(
 		)
 	}
 
-	return warnings, nil
+	if len(errors) == 0 {
+		return warnings, nil
+	}
+
+	return warnings, apierrors.NewInvalid(
+		natGateway.GroupVersionKind().GroupKind(),
+		natGateway.Name,
+		errors,
+	)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NATGateway.
