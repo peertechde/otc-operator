@@ -193,8 +193,7 @@ func (r *SNATRuleReconciler) reconcileCreate(
 		Str("external-id", resp.ID).
 		Msg("Successfully created SNAT rule")
 
-	// Requeue immediately to check the status of the new resource.
-	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	return ctrl.Result{}, nil
 }
 
 // reconcileUpdate handles the logic for an existing external resource. It
