@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get the version from the Git tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Build and push container image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Use the Git tag for the image tag
+          tags: ghcr.io/${{ github.repository }}:${{ env.VERSION }}
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build release.yaml manifest
+        run: |
+          make build-release-manifest IMAGE_NAME=ghcr.io/${{ github.repository }} IMAGE_TAG=${{ env.VERSION }}
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            Release of version ${{ env.VERSION }} of the OTC Operator.
+            
+            ### Installation
+            To install this version, apply the attached `release.yaml` manifest:
+            ```sh
+            kubectl apply -f https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/release.yaml
+            ```
+          prerelease: true
+
+      - name: Upload release.yaml to Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Get the upload URL from the output of the 'create_release' step
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release.yaml
+          asset_name: release.yaml
+          asset_content_type: application/yaml
