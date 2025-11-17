@@ -38,9 +38,9 @@ Follow these steps to deploy the OTC Operator to your cluster.
 
 The OTC Operator uses webhooks to validate its custom resources, which requires `cert-manager` to be installed in your cluster for managing TLS certificates.
 
-Install `cert-manager` using the official manifest. Replace <latest-version> with the actual latest version tag (e.g., v1.19.1).
+Install `cert-manager` using the official manifest.
 ```sh
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/<latest-version>/cert-manager.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 ```
 
 Wait for the cert-manager pods to become ready before proceeding.
