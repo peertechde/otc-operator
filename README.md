@@ -1,133 +1,179 @@
-# otc-operator
+# Open Telekom Cloud (OTC) Kubernetes Operator
 
-## Description
+> **Note:** This project is currently in an **alpha** stage and is part of ongoing research and development. It should be considered experimental. The APIs and features are subject to change without notice. It is not recommended for use in production environments.
+
+The OTC Operator allows you to manage Open Telekom Cloud resources natively from within your Kubernetes cluster using Custom Resource Definitions (CRDs). It bridges the gap between Kubernetes and the OTC API, enabling you to define your cloud infrastructure as code and integrate it seamlessly with GitOps workflows.
+
+## Overview
+
+This operator follows the standard Kubernetes controller pattern. You define the desired state of your OTC resources in YAML manifests and the operator's controllers work to bring the actual state of your cloud environment into alignment with that desired state.
+
+### Supported Resources
+
+The OTC Operator currently supports managing the following resources:
+* `ProviderConfig`: Defines credentials and connection details for an OTC project.
+* `Network`: Corresponds to an Virtual Private Cloud (VPC).
+* `Subnet`: A subnet within a VPC.
+* `SecurityGroup`: A collection of access control rules for cloud resources.
+* `SecurityGroupRule`: A rule within a Security Group.
+* `PublicIP`: An Elastic IP (EIP) address.
+* `NATGateway`: A Network Address Translation Gateway.
+* `SNATRule`: A Source NAT rule for a NAT Gateway.
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+*   A running Kubernetes cluster (v1.25+ recommended).
+*   `kubectl` installed and configured to communicate with your cluster.
+*   An Open Telekom Cloud account with your domain name, project ID and one of the following credential types:
+    *   An IAM username and password.
+    *   An Access Key (AK) and Secret Key (SK) pair.
 
+### Installation
+
+Follow these steps to deploy the OTC Operator to your cluster.
+
+#### Step 1: Install cert-manager
+
+The OTC Operator uses webhooks to validate its custom resources, which requires `cert-manager` to be installed in your cluster for managing TLS certificates.
+
+Install `cert-manager` using the official manifest.
 ```sh
-make docker-build docker-push IMG=<some-registry>/otc-operator:tag
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+Wait for the cert-manager pods to become ready before proceeding.
 
-**Install the CRDs into the cluster:**
+#### Step 2: Install the OTC Operator
 
+The recommended way to install the operator is by using the pre-built release.yaml manifest from the [latest GitHub release](https://github.com/peertechde/otc-operator/releases/latest).
+
+Install `otc-operator` using the official manifest.
 ```sh
-make install
+kubectl apply -f https://github.com/peertechde/otc-operator/releases/latest/download/release.yaml
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+This command will:
+* Create the otc-operator-system namespace. 
+* Install all the necessary Custom Resource Definitions (CRDs). 
+* Create the operator Deployment. 
+* Set up the required RBAC roles and permissions.
+
+After a few moments, the operator pod should be running in the `otc-operator-system` namespace.
+
+## Usage: Creating Your First Network
+
+Let's walk through creating a `ProviderConfig`, a `Network` (VPC) and a `Subnet`.
+
+### 1. Create a Credentials Secret
+
+Choose **one** of the options below and create a Kubernetes Secret containing your credentials.
+
+#### Option A: Using Username and Password
+
+Run the following command, replacing the placeholder values with your actual credentials.
 
 ```sh
-make deploy IMG=<some-registry>/otc-operator:tag
+kubectl create secret generic otc-credentials \
+  --from-literal=username='YOUR_USERNAME' \
+  --from-literal=password='YOUR_PASSWORD' \
+  -n default # Or your target namespace
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+#### Option B: Using Access Key and Secret Key
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+Run the following command, replacing the placeholders with your actual keys.
 
 ```sh
-kubectl apply -k config/samples/
+kubectl create secret generic otc-credentials \
+  --from-literal=accessKey='YOUR_ACCESS_KEY' \
+  --from-literal=secretKey='YOUR_SECRET_KEY' \
+  -n default # Or your target namespace
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+### 2. Create a ProviderConfig
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+Next, create a `ProviderConfig` resource that tells the operator how to connect to your OTC project and references the secret you just created.
+
+**`provider-config.yaml`**
+```yaml
+apiVersion: otc.peertech.de/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: otc-provider-config
+  namespace: default # Or your target namespace
+spec:
+  identityEndpoint: "https://iam.eu-de.otc.t-systems.com/v3"
+  region: "eu-de"
+  domainName: "YOUR_OTC_DOMAIN_NAME"  # Your OTC Domain Name
+  projectID: "YOUR_OTC_PROJECT_ID"    # Your OTC Project ID
+  credentialsSecretRef:
+    name: otc-credentials
+    namespace: default # Or your target namespace
+```
+Apply the `ProviderConfig`:
+```sh
+kubectl apply -f provider-config.yaml
+```
+
+### 3. Create a Network (VPC)
+
+Now you can create your first cloud resource.
+
+**`network.yaml`**
+```yaml
+apiVersion: otc.peertech.de/v1alpha1
+kind: Network
+metadata:
+  name: my-first-vpc
+  namespace: default # Or your target namespace
+spec:
+  providerConfigRef:
+    # This must match the ProviderConfig you created
+    name: otc-provider-config
+  cidr: "10.0.0.0/16"
+  description: "VPC created by the OTC Operator"
+```
+
+Apply the `Network`:
+```sh
+kubectl apply -f network.yaml
+```
+
+### 4. Create a Subnet
+
+Finally, create a `Subnet` that lives inside the `Network` you just created. Note the `networkRef` which tells the operator about the dependency.
+
+**`subnet.yaml`**
+```yaml
+apiVersion: otc.peertech.de/v1alpha1
+kind: Subnet
+metadata:
+  name: my-first-subnet
+  namespace: default # Or your target namespace
+spec:
+  providerConfigRef:
+    name: otc-provider-config
+  network:
+    # This tells the operator to find the 'my-first-vpc' Network
+    # in the same namespace and use it as a dependency.
+    networkRef:
+      name: my-first-vpc
+  cidr: "10.0.1.0/24"
+  gatewayIP: "10.0.1.1"
+  description: "Subnet created by the OTC Operator"
+```
+
+Apply the `Subnet`:
+```sh
+kubectl apply -f subnet.yaml
+```
+
+### 5. Check the Status
+
+After a few moments, the operator will create the resources in OTC. You can check the status of your Kubernetes resource to see the cloud provider's ID (externalID) and the resource's condition.
 
 ```sh
-kubectl delete -k config/samples/
+kubectl get subnet my-first-subnet -o yaml
 ```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/otc-operator:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/otc-operator/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-kubebuilder edit --plugins=helm/v1-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
