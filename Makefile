@@ -1,5 +1,7 @@
 # Image URL to use all building/pushing image targets
-IMG ?= otc-operator:latest
+IMAGE_NAME ?= otc-operator
+IMAGE_TAG ?= latest
+IMG ?= $(IMAGE_NAME):$(IMAGE_TAG)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -127,11 +129,20 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-.PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
+##@ Release
+
+# IMAGE_NAME and IMAGE_TAG can be overridden on the command line for release builds.
+# e.g., make build-release-manifest IMAGE_NAME=your-repo/otc-operator IMAGE_TAG=v0.1.0
+.PHONY: build-release-manifest
+build-release-manifest:
+	@echo "--- Building release.yaml with image $(IMG) ---"
+	@# Temporarily set the image tag in the kustomization file for the build.
+	cd config/manager && kustomize edit set image controller=$(IMG)
+	@# Build the final manifest, outputting to the project root.
+	kustomize build config/default > $(PWD)/release.yaml
+	@# Resetting the kustomization file to its original state to keep the git tree clean.
+	git checkout -- config/manager/kustomization.yaml
+	@echo "Successfully created release.yaml in the project root."
 
 ##@ Deployment
 
