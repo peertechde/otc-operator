@@ -49,9 +49,9 @@ Wait for the cert-manager pods to become ready before proceeding.
 
 The recommended way to install the operator is by using the pre-built release.yaml manifest from the [latest GitHub release](https://github.com/peertechde/otc-operator/releases/latest).
 
-Replace <latest-version> with the actual latest version tag (e.g., v0.0.3).
+Install `otc-operator` using the official manifest.
 ```sh
-kubectl apply -f https://github.com/peertechde/otc-operator/releases/download/<latest-version>/release.yaml
+kubectl apply -f https://github.com/peertechde/otc-operator/releases/latest/download/release.yaml
 ```
 
 This command will:
