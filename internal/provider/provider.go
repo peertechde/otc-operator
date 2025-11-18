@@ -145,21 +145,10 @@ func New(opts ...Option) (Provider, error) {
 		return nil, fmt.Errorf("failed to create network client: %w", err)
 	}
 
-	rdsv3, err := openstack.NewRDSV3(
-		client,
-		gophercloud.EndpointOpts{
-			Region: options.Region,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create rds client: %w", err)
-	}
-
 	p := &provider{
 		client:         client,
 		identityClient: identityV3,
 		networkClient:  networkv1,
-		rdsClient:      rdsv3,
 	}
 
 	return p, nil
@@ -169,7 +158,6 @@ type provider struct {
 	client         *gophercloud.ProviderClient
 	identityClient *gophercloud.ServiceClient
 	networkClient  *gophercloud.ServiceClient
-	rdsClient      *gophercloud.ServiceClient
 }
 
 // Validate validates the connection and permissions.
