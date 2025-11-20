@@ -142,22 +142,34 @@ func New(opts ...Option) (Provider, error) {
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create network client: %w", err)
+		return nil, fmt.Errorf("failed to create network v1 client: %w", err)
+	}
+
+	networkv3, err := openstack.NewVpcV3(
+		client,
+		gophercloud.EndpointOpts{
+			Region: options.Region,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create network VPC v3 client: %w", err)
 	}
 
 	p := &provider{
-		client:         client,
-		identityClient: identityV3,
-		networkClient:  networkv1,
+		client:          client,
+		identityClient:  identityV3,
+		networkClient:   networkv1,
+		networkv3Client: networkv3,
 	}
 
 	return p, nil
 }
 
 type provider struct {
-	client         *gophercloud.ProviderClient
-	identityClient *gophercloud.ServiceClient
-	networkClient  *gophercloud.ServiceClient
+	client          *gophercloud.ProviderClient
+	identityClient  *gophercloud.ServiceClient
+	networkClient   *gophercloud.ServiceClient
+	networkv3Client *gophercloud.ServiceClient
 }
 
 // Validate validates the connection and permissions.

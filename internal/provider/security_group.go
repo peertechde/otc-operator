@@ -48,7 +48,7 @@ func (p *provider) CreateSecurityGroup(
 		},
 	}
 
-	securityGroup, err := group.Create(p.networkClient, createOpts)
+	securityGroup, err := group.Create(p.networkv3Client, createOpts)
 	if err != nil {
 		return CreateSecurityGroupResponse{}, fmt.Errorf(
 			"failed to create security group: %w",
@@ -60,7 +60,7 @@ func (p *provider) CreateSecurityGroup(
 }
 
 func (p *provider) GetSecurityGroup(ctx context.Context, id string) (*SecurityGroupInfo, error) {
-	securityGroup, err := group.Get(p.networkClient, id)
+	securityGroup, err := group.Get(p.networkv3Client, id)
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, ErrNotFound
@@ -88,7 +88,7 @@ func (p *provider) UpdateSecurityGroup(
 		},
 	}
 
-	_, err := group.Update(p.networkClient, id, updateOpts)
+	_, err := group.Update(p.networkv3Client, id, updateOpts)
 	if err != nil {
 		return fmt.Errorf("failed to update security group %s: %w", id, err)
 	}
@@ -96,7 +96,7 @@ func (p *provider) UpdateSecurityGroup(
 }
 
 func (p *provider) DeleteSecurityGroup(ctx context.Context, id string) error {
-	err := group.Delete(p.networkClient, id)
+	err := group.Delete(p.networkv3Client, id)
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil

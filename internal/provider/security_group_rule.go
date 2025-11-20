@@ -71,7 +71,7 @@ func (p *provider) CreateSecurityGroupRule(
 		createOpts.SecurityGroupRule.Priority = *r.Priority
 	}
 
-	securityGroupRule, err := rules.Create(p.networkClient, createOpts)
+	securityGroupRule, err := rules.Create(p.networkv3Client, createOpts)
 	if err != nil {
 		return CreateSecurityGroupRuleResponse{}, fmt.Errorf(
 			"failed to create security group rule: %w",
@@ -86,7 +86,7 @@ func (p *provider) GetSecurityGroupRule(
 	ctx context.Context,
 	id string,
 ) (*SecurityGroupRuleInfo, error) {
-	rule, err := rules.Get(p.networkClient, id)
+	rule, err := rules.Get(p.networkv3Client, id)
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, ErrNotFound
@@ -113,7 +113,7 @@ func (p *provider) DeleteSecurityGroupRule(
 	ctx context.Context,
 	id string,
 ) error {
-	err := rules.Delete(p.networkClient, id)
+	err := rules.Delete(p.networkv3Client, id)
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil
