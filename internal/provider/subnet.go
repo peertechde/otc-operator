@@ -91,7 +91,7 @@ func (p *provider) CreateSubnet(
 		VpcID: r.NetworkID,
 	}
 
-	subnet, err := subnets.Create(p.networkClient, createOpts).Extract()
+	subnet, err := subnets.Create(p.networkv1Client, createOpts).Extract()
 	if err != nil {
 		return CreateSubnetResponse{}, fmt.Errorf("failed to create subnet: %w", err)
 	}
@@ -104,7 +104,7 @@ func (p *provider) CreateSubnet(
 }
 
 func (p *provider) GetSubnet(ctx context.Context, id string) (*SubnetInfo, error) {
-	subnet, err := subnets.Get(p.networkClient, id).Extract()
+	subnet, err := subnets.Get(p.networkv1Client, id).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, ErrNotFound
@@ -137,7 +137,7 @@ func (p *provider) UpdateSubnet(
 		Description: &r.Description,
 	}
 
-	_, err := subnets.Update(p.networkClient, networkID, id, updateOpts).Extract()
+	_, err := subnets.Update(p.networkv1Client, networkID, id, updateOpts).Extract()
 	if err != nil {
 		return fmt.Errorf("failed to update subnet %s: %w", id, err)
 	}
@@ -145,7 +145,7 @@ func (p *provider) UpdateSubnet(
 }
 
 func (p *provider) DeleteSubnet(ctx context.Context, networkID, id string) error {
-	err := subnets.Delete(p.networkClient, networkID, id).ExtractErr()
+	err := subnets.Delete(p.networkv1Client, networkID, id).ExtractErr()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil
@@ -161,7 +161,7 @@ func (p *provider) findSubnetByName(networkID, name string) (*SubnetInfo, error)
 		Name:  name,
 		VpcID: networkID,
 	}
-	list, err := subnets.List(p.networkClient, listOpts)
+	list, err := subnets.List(p.networkv1Client, listOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list subnets: %w", err)
 	}

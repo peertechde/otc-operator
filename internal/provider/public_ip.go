@@ -133,7 +133,7 @@ func (p *provider) CreatePublicIP(
 		},
 	}
 
-	publicIP, err := eips.Apply(p.networkClient, createOpts).Extract()
+	publicIP, err := eips.Apply(p.networkv1Client, createOpts).Extract()
 	if err != nil {
 		return CreatePublicIPResponse{}, fmt.Errorf("failed to create public IP: %w", err)
 	}
@@ -149,7 +149,7 @@ func (p *provider) CreatePublicIP(
 }
 
 func (p *provider) GetPublicIP(ctx context.Context, id string) (*PublicIPInfo, error) {
-	publicIP, err := eips.Get(p.networkClient, id).Extract()
+	publicIP, err := eips.Get(p.networkv1Client, id).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, ErrNotFound
@@ -172,7 +172,7 @@ func (p *provider) GetPublicIP(ctx context.Context, id string) (*PublicIPInfo, e
 }
 
 func (p *provider) DeletePublicIP(ctx context.Context, id string) error {
-	err := eips.Delete(p.networkClient, id).ExtractErr()
+	err := eips.Delete(p.networkv1Client, id).ExtractErr()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil

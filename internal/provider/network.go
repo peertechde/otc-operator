@@ -69,7 +69,7 @@ func (p *provider) CreateNetwork(
 		CIDR:        r.Cidr,
 	}
 
-	vpc, err := vpcs.Create(p.networkClient, createOpts).Extract()
+	vpc, err := vpcs.Create(p.networkv1Client, createOpts).Extract()
 	if err != nil {
 		return CreateNetworkResponse{}, fmt.Errorf("failed to create network: %w", err)
 	}
@@ -82,7 +82,7 @@ func (p *provider) CreateNetwork(
 }
 
 func (p *provider) GetNetwork(ctx context.Context, id string) (*NetworkInfo, error) {
-	vpc, err := vpcs.Get(p.networkClient, id).Extract()
+	vpc, err := vpcs.Get(p.networkv1Client, id).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, ErrNotFound
@@ -110,7 +110,7 @@ func (p *provider) UpdateNetwork(
 		Description: &r.Description,
 	}
 
-	_, err := vpcs.Update(p.networkClient, id, updateOpts).Extract()
+	_, err := vpcs.Update(p.networkv1Client, id, updateOpts).Extract()
 	if err != nil {
 		return fmt.Errorf("failed to update network %s: %w", id, err)
 	}
@@ -118,7 +118,7 @@ func (p *provider) UpdateNetwork(
 }
 
 func (p *provider) DeleteNetwork(ctx context.Context, id string) error {
-	err := vpcs.Delete(p.networkClient, id).ExtractErr()
+	err := vpcs.Delete(p.networkv1Client, id).ExtractErr()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil

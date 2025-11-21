@@ -10,6 +10,7 @@ import (
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/identity/v3/regions"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/networking/v1/subnets"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/networking/v1/vpcs"
+	"github.com/opentelekomcloud/gophertelekomcloud/openstack/networking/v2/extensions/natgateways"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/vpc/v3/security/group"
 )
 
@@ -156,11 +157,22 @@ func New(opts ...Option) (Provider, error) {
 		return nil, fmt.Errorf("failed to create network v3 client: %w", err)
 	}
 
+	natv2, err := openstack.NewNatV2(
+		client,
+		gophercloud.EndpointOpts{
+			Region: options.Region,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create network v3 client: %w", err)
+	}
+
 	p := &provider{
 		client:          client,
 		identityClient:  identityV3,
-		networkClient:   networkv1,
+		networkv1Client: networkv1,
 		networkv3Client: networkv3,
+		natClient:       natv2,
 	}
 
 	return p, nil
@@ -169,8 +181,9 @@ func New(opts ...Option) (Provider, error) {
 type provider struct {
 	client          *gophercloud.ProviderClient
 	identityClient  *gophercloud.ServiceClient
-	networkClient   *gophercloud.ServiceClient
+	networkv1Client *gophercloud.ServiceClient
 	networkv3Client *gophercloud.ServiceClient
+	natClient       *gophercloud.ServiceClient
 }
 
 // Validate validates the connection and permissions.
@@ -181,7 +194,7 @@ func (p *provider) Validate(ctx context.Context) error {
 	}
 
 	// Validate Network v1 (VPC) permissions
-	if _, err := vpcs.List(p.networkClient, vpcs.ListOpts{}); err != nil {
+	if _, err := vpcs.List(p.networkv1Client, vpcs.ListOpts{}); err != nil {
 		return fmt.Errorf(
 			"network validation failed: could not list VPCs (check permissions): %w",
 			err,
@@ -189,17 +202,25 @@ func (p *provider) Validate(ctx context.Context) error {
 	}
 
 	// Validate Network v1 (Subnet) permissions
-	if _, err := subnets.List(p.networkClient, subnets.ListOpts{}); err != nil {
+	if _, err := subnets.List(p.networkv1Client, subnets.ListOpts{}); err != nil {
 		return fmt.Errorf(
 			"network validation failed: could not list Subnets (check permissions): %w",
 			err,
 		)
 	}
 
-	// Validate Network v3(Security Groups) permissions
+	// Validate Network v3 (Security Groups) permissions
 	if _, err := group.List(p.networkv3Client, group.ListQueryParams{Limit: 1}); err != nil {
 		return fmt.Errorf(
 			"network validation failed: could not list Security Groups (check permissions): %w",
+			err,
+		)
+	}
+
+	// Validate NAT v2 (NAT gateway) permissions
+	if _, err := natgateways.List(p.natClient, natgateways.ListOpts{Limit: 1}).AllPages(); err != nil {
+		return fmt.Errorf(
+			"NAT gateway validation failed: could not list NAT gateways (check permissions): %w",
 			err,
 		)
 	}
