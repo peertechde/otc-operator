@@ -10,6 +10,7 @@ import (
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/identity/v3/regions"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/networking/v1/subnets"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/networking/v1/vpcs"
+	"github.com/opentelekomcloud/gophertelekomcloud/openstack/vpc/v3/security/group"
 )
 
 const (
@@ -142,22 +143,34 @@ func New(opts ...Option) (Provider, error) {
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create network client: %w", err)
+		return nil, fmt.Errorf("failed to create network v1 client: %w", err)
+	}
+
+	networkv3, err := openstack.NewVpcV3(
+		client,
+		gophercloud.EndpointOpts{
+			Region: options.Region,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create network v3 client: %w", err)
 	}
 
 	p := &provider{
-		client:         client,
-		identityClient: identityV3,
-		networkClient:  networkv1,
+		client:          client,
+		identityClient:  identityV3,
+		networkClient:   networkv1,
+		networkv3Client: networkv3,
 	}
 
 	return p, nil
 }
 
 type provider struct {
-	client         *gophercloud.ProviderClient
-	identityClient *gophercloud.ServiceClient
-	networkClient  *gophercloud.ServiceClient
+	client          *gophercloud.ProviderClient
+	identityClient  *gophercloud.ServiceClient
+	networkClient   *gophercloud.ServiceClient
+	networkv3Client *gophercloud.ServiceClient
 }
 
 // Validate validates the connection and permissions.
@@ -167,7 +180,7 @@ func (p *provider) Validate(ctx context.Context) error {
 		return fmt.Errorf("identity validation failed: failed to list regions: %w", err)
 	}
 
-	// Validate Network (VPC) permissions
+	// Validate Network v1 (VPC) permissions
 	if _, err := vpcs.List(p.networkClient, vpcs.ListOpts{}); err != nil {
 		return fmt.Errorf(
 			"network validation failed: could not list VPCs (check permissions): %w",
@@ -175,10 +188,18 @@ func (p *provider) Validate(ctx context.Context) error {
 		)
 	}
 
-	// Validate Network (VPC) permissions
+	// Validate Network v1 (Subnet) permissions
 	if _, err := subnets.List(p.networkClient, subnets.ListOpts{}); err != nil {
 		return fmt.Errorf(
-			"network validation failed: could not list VPCs (check permissions): %w",
+			"network validation failed: could not list Subnets (check permissions): %w",
+			err,
+		)
+	}
+
+	// Validate Network v3(Security Groups) permissions
+	if _, err := group.List(p.networkv3Client, group.ListQueryParams{Limit: 1}); err != nil {
+		return fmt.Errorf(
+			"network validation failed: could not list Security Groups (check permissions): %w",
 			err,
 		)
 	}

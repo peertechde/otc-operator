@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -161,47 +162,60 @@ func (r *SecurityGroupRuleReconciler) reconcileCreate(
 	securityGroupRule.Status.ResolvedDependencies.SecurityGroupID = securityGroupID
 
 	// Create the external resource.
-	logger.Info().Msg("Creating security group rule")
+	logger.Info().Msg("Creating Security Group Rule")
 
 	// Set creating status.
 	rc.SetCreating()
 
+	err = r.createRule(ctx, logger, p, rc, securityGroupRule, securityGroupID)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: securityGroupRuleRequeueDelay}, err
+	}
+
+	logger.Info().
+		Str("external-id", securityGroupRule.Status.ExternalID).
+		Msg("Successfully created Security Group Rule")
+
+	return ctrl.Result{}, nil
+}
+
+func (r *SecurityGroupRuleReconciler) createRule(
+	ctx context.Context,
+	logger zerolog.Logger,
+	p provider.Provider,
+	rc *Reconciler,
+	securityGroupRule *otcv1alpha1.SecurityGroupRule,
+	securityGroupID string,
+) error {
 	createReq := provider.CreateSecurityGroupRuleRequest{
-		Name:        securityGroupRule.GetName(),
-		Description: securityGroupRule.Spec.Description,
-		Direction:   string(securityGroupRule.Spec.Direction),
-		Protocol:    string(securityGroupRule.Spec.Protocol),
-		EtherType:   string(securityGroupRule.Spec.Ethertype),
-		Multiport:   securityGroupRule.Spec.Multiport,
-		Action:      string(securityGroupRule.Spec.Action),
-		Priority:    securityGroupRule.Spec.Priority,
+		Name:            securityGroupRule.GetName(),
+		Description:     securityGroupRule.Spec.Description,
+		Direction:       string(securityGroupRule.Spec.Direction),
+		Protocol:        string(securityGroupRule.Spec.Protocol),
+		EtherType:       string(securityGroupRule.Spec.Ethertype),
+		Multiport:       securityGroupRule.Spec.Multiport,
+		Action:          string(securityGroupRule.Spec.Action),
+		SecurityGroupID: securityGroupID,
 	}
 	if securityGroupRule.Spec.Priority != nil {
 		createReq.Priority = securityGroupRule.Spec.Priority
 	}
 
-	resp, err := p.CreateSecurityGroupRule(
-		ctx,
-		createReq,
-	)
+	resp, err := p.CreateSecurityGroupRule(ctx, createReq)
 	if err != nil {
 		rc.SetReconciliationFailed(
 			WithReason(reasonProvisioningFailed),
 			WithMessagef("Failed to create resource: %v", err),
 		)
-		logger.Error().Err(err).Msg("Failed to create security group rule")
-		return ctrl.Result{RequeueAfter: securityGroupRuleRequeueDelay}, nil
+		logger.Error().Err(err).Msg("Failed to create Security Group Rule")
+		return err
 	}
 
 	// Update status fields.
 	securityGroupRule.Status.ExternalID = resp.ID
 	securityGroupRule.Status.LastAppliedSpec = securityGroupRule.Spec.DeepCopy()
 
-	logger.Info().
-		Str("external-id", resp.ID).
-		Msg("Successfully created security group rule")
-
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // reconcileUpdate handles the logic for an existing external resource. It
@@ -230,7 +244,7 @@ func (r *SecurityGroupRuleReconciler) reconcileUpdate(
 			WithReason(reasonProviderError),
 			WithMessagef("Failed to check existing SecurityGroupRule: %v", err),
 		)
-		logger.Error().Err(err).Msg("Failed to check existing security group rule")
+		logger.Error().Err(err).Msg("Failed to check existing Security Group Rule")
 		return ctrl.Result{RequeueAfter: securityGroupRuleRequeueDelay}, nil
 	}
 
@@ -263,9 +277,9 @@ func (r *SecurityGroupRuleReconciler) reconcileUpdate(
 		Str("external-id", info.ID).
 		Msg("Found existing security group")
 
-	updateReq, needsUpdate := r.detectDrift(logger, securityGroupRule)
+	needsUpdate := r.detectDrift(logger, securityGroupRule)
 	if needsUpdate {
-		return r.handleDrift(ctx, logger, p, rc, securityGroupRule, updateReq)
+		return r.handleDrift(ctx, logger, p, rc, securityGroupRule)
 	}
 
 	// Check readiness status.
@@ -273,21 +287,72 @@ func (r *SecurityGroupRuleReconciler) reconcileUpdate(
 }
 
 func (r *SecurityGroupRuleReconciler) detectDrift(
-	_ zerolog.Logger,
-	_ *otcv1alpha1.SecurityGroupRule,
-) (provider.UpdateSecurityGroupRuleRequest, bool) {
-	return provider.UpdateSecurityGroupRuleRequest{}, false
+	logger zerolog.Logger,
+	rule *otcv1alpha1.SecurityGroupRule,
+) bool {
+	if rule.Status.LastAppliedSpec == nil {
+		return false
+	}
+
+	if !reflect.DeepEqual(rule.Spec, *rule.Status.LastAppliedSpec) {
+		logger.Info().Msg("Drift detected")
+		return true
+	}
+
+	return false
 }
 
 // handleDrift applies updates to the drifted resource.
 func (r *SecurityGroupRuleReconciler) handleDrift(
-	_ context.Context,
-	_ zerolog.Logger,
-	_ provider.Provider,
-	_ *Reconciler,
-	_ *otcv1alpha1.SecurityGroupRule,
-	_ provider.UpdateSecurityGroupRuleRequest,
+	ctx context.Context,
+	logger zerolog.Logger,
+	p provider.Provider,
+	rc *Reconciler,
+	securityGroupRule *otcv1alpha1.SecurityGroupRule,
 ) (ctrl.Result, error) {
+	logger.Info().Msg("Applying updates to external resource")
+
+	// Set updating status.
+	rc.SetUpdating()
+
+	logger.Info().
+		Str("external-id", securityGroupRule.Status.ExternalID).
+		Msg("Deleting drifted Security Group Rule")
+
+	if err := p.DeleteSecurityGroupRule(ctx, securityGroupRule.Status.ExternalID); err != nil {
+		rc.SetReconciliationFailed(
+			WithReason(reasonUpdateFailed),
+			WithMessagef("Failed to delete drifted resource: %v", err),
+		)
+		logger.Error().Err(err).Msg("Failed to delete resource")
+		return ctrl.Result{RequeueAfter: securityGroupRuleRequeueDelay}, err
+	}
+
+	// Clear the ExternalID. If the subsequent create fails, the next reconcile
+	// loop will treat this as a "Create" scenario.
+	securityGroupRule.Status.ExternalID = ""
+
+	securityGroupID := securityGroupRule.Status.ResolvedDependencies.SecurityGroupID
+	if securityGroupID == "" {
+		rc.SetReconciliationFailed(
+			WithReason(reasonDependenciesNotResolved),
+			WithMessage("Parent Security Group ID missing from status"),
+		)
+
+		// Force a requeue to run through reconcileCreate
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	logger.Info().Msg("Creatig new Security Group Rule")
+	err := r.createRule(ctx, logger, p, rc, securityGroupRule, securityGroupID)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: securityGroupRuleRequeueDelay}, err
+	}
+
+	logger.Info().
+		Str("external-id", securityGroupRule.Status.ExternalID).
+		Msg("Successfully created Security Group Rule")
+
 	// Requeue immediately to re-check the status after the update.
 	return ctrl.Result{Requeue: true}, nil
 }
