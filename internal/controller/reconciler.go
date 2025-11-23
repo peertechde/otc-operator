@@ -69,6 +69,10 @@ func (rc *Reconciler) UpdateStatus(ctx context.Context) error {
 		client.MergeFrom(rc.originalObject),
 	)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			rc.logger.Debug().Msg("Skipping status update for already deleted object")
+			return nil
+		}
 		rc.logger.Error().Err(err).Msg("Failed to update status")
 		return err
 	}
