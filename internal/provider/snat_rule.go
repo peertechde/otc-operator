@@ -88,7 +88,7 @@ func (p *provider) CreateSNATRule(
 		FloatingIPID: r.PublicIPID,
 	}
 
-	snatRule, err := snatrules.Create(p.networkClient, createOpts)
+	snatRule, err := snatrules.Create(p.natClient, createOpts)
 	if err != nil {
 		return CreateSNATRuleResponse{}, fmt.Errorf("failed to create snat rule: %w", err)
 	}
@@ -104,7 +104,7 @@ func (p *provider) CreateSNATRule(
 }
 
 func (p *provider) GetSNATRule(ctx context.Context, id string) (*SNATRuleInfo, error) {
-	snatRule, err := snatrules.Get(p.networkClient, id)
+	snatRule, err := snatrules.Get(p.natClient, id)
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, ErrNotFound
@@ -128,7 +128,7 @@ func (p *provider) GetSNATRule(ctx context.Context, id string) (*SNATRuleInfo, e
 }
 
 func (p *provider) DeleteSNATRule(ctx context.Context, id string) error {
-	err := snatrules.Delete(p.networkClient, id)
+	err := snatrules.Delete(p.natClient, id)
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil
@@ -141,7 +141,7 @@ func (p *provider) DeleteSNATRule(ctx context.Context, id string) error {
 
 func (p *provider) waitForSNATRule(ctx context.Context, id string) error {
 	err := retry.Do(ctx, func() (bool, error) {
-		snatRule, err := snatrules.Get(p.networkClient, id)
+		snatRule, err := snatrules.Get(p.natClient, id)
 		if err != nil {
 			return true, err
 		}

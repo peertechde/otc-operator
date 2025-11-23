@@ -8,6 +8,7 @@ import (
 	gophercloud "github.com/opentelekomcloud/gophertelekomcloud"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/networking/v2/extensions/natgateways"
 
+	otcv1alpha1 "github.com/peertech.de/otc-operator/api/v1alpha1"
 	"github.com/peertech.de/otc-operator/internal/retry"
 )
 
@@ -22,7 +23,7 @@ import (
 type CreateNATGatewayRequest struct {
 	Name        string
 	Description string
-	Type        string
+	Type        otcv1alpha1.NATGatewayType
 
 	// dependencies
 	NetworkID string
@@ -87,17 +88,33 @@ func (p *provider) CreateNATGateway(
 	ctx context.Context,
 	r CreateNATGatewayRequest,
 ) (CreateNATGatewayResponse, error) {
+	var natType string
+	switch r.Type {
+	case otcv1alpha1.TypeMicro:
+		natType = "0"
+	case otcv1alpha1.TypeSmall:
+		natType = "1"
+	case otcv1alpha1.TypeMedium:
+		natType = "2"
+	case otcv1alpha1.TypeLarge:
+		natType = "3"
+	case otcv1alpha1.TypeExtraLarge:
+		natType = "4"
+	default:
+		return CreateNATGatewayResponse{}, fmt.Errorf("unknown NAT gateway type: %s", r.Type)
+	}
+
 	createOpts := natgateways.CreateOpts{
 		Name:        r.Name,
 		Description: r.Description,
-		Spec:        r.Type,
+		Spec:        natType,
 
 		// dependencies
 		RouterID:          r.NetworkID,
 		InternalNetworkID: r.SubnetID,
 	}
 
-	natGateway, err := natgateways.Create(p.networkClient, createOpts).Extract()
+	natGateway, err := natgateways.Create(p.natClient, createOpts).Extract()
 	if err != nil {
 		return CreateNATGatewayResponse{}, fmt.Errorf("failed to create nat gateway: %w", err)
 	}
@@ -113,7 +130,7 @@ func (p *provider) CreateNATGateway(
 }
 
 func (p *provider) GetNATGateway(ctx context.Context, id string) (*NATGatewayInfo, error) {
-	natGateway, err := natgateways.Get(p.networkClient, id).Extract()
+	natGateway, err := natgateways.Get(p.natClient, id).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil, ErrNotFound
@@ -146,7 +163,7 @@ func (p *provider) UpdateNATGateway(
 		Spec:        r.Type,
 	}
 
-	_, err := natgateways.Update(p.networkClient, id, updateOpts).Extract()
+	_, err := natgateways.Update(p.natClient, id, updateOpts).Extract()
 	if err != nil {
 		return fmt.Errorf("failed to update nat gateway %s: %w", id, err)
 	}
@@ -154,7 +171,7 @@ func (p *provider) UpdateNATGateway(
 }
 
 func (p *provider) DeleteNATGateway(ctx context.Context, id string) error {
-	err := natgateways.Delete(p.networkClient, id).ExtractErr()
+	err := natgateways.Delete(p.natClient, id).ExtractErr()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			return nil
