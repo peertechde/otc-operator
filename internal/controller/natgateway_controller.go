@@ -178,7 +178,7 @@ func (r *NATGatewayReconciler) reconcileCreate(
 		provider.CreateNATGatewayRequest{
 			Name:        natGateway.GetName(),
 			Description: natGateway.Spec.Description,
-			Type:        string(natGateway.Spec.Type),
+			Type:        natGateway.Spec.Type,
 			NetworkID:   networkID,
 			SubnetID:    subnetID,
 		},

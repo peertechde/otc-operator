@@ -8,6 +8,7 @@ import (
 	gophercloud "github.com/opentelekomcloud/gophertelekomcloud"
 	"github.com/opentelekomcloud/gophertelekomcloud/openstack/networking/v2/extensions/natgateways"
 
+	otcv1alpha1 "github.com/peertech.de/otc-operator/api/v1alpha1"
 	"github.com/peertech.de/otc-operator/internal/retry"
 )
 
@@ -22,7 +23,7 @@ import (
 type CreateNATGatewayRequest struct {
 	Name        string
 	Description string
-	Type        string
+	Type        otcv1alpha1.NATGatewayType
 
 	// dependencies
 	NetworkID string
@@ -87,10 +88,26 @@ func (p *provider) CreateNATGateway(
 	ctx context.Context,
 	r CreateNATGatewayRequest,
 ) (CreateNATGatewayResponse, error) {
+	var natType string
+	switch r.Type {
+	case otcv1alpha1.TypeMicro:
+		natType = "0"
+	case otcv1alpha1.TypeSmall:
+		natType = "1"
+	case otcv1alpha1.TypeMedium:
+		natType = "2"
+	case otcv1alpha1.TypeLarge:
+		natType = "3"
+	case otcv1alpha1.TypeExtraLarge:
+		natType = "4"
+	default:
+		return CreateNATGatewayResponse{}, fmt.Errorf("unknown NAT gateway type: %s", r.Type)
+	}
+
 	createOpts := natgateways.CreateOpts{
 		Name:        r.Name,
 		Description: r.Description,
-		Spec:        r.Type,
+		Spec:        natType,
 
 		// dependencies
 		RouterID:          r.NetworkID,
